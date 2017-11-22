@@ -28,7 +28,7 @@ void createProducer(int, int, int);
 void createConsumers(int, int, int);
 
 typedef struct {
-    int numItems, threadNum, msqId, msg_size;
+    int numItems, threadNum, msqId, msgSize;
 } thread_args;
 
 struct rand_msgbuf {
@@ -41,23 +41,22 @@ void *threadFunc(void* args) {
     int numItems = arguments->numItems;
     int threadNum = arguments->threadNum;
     int msqId = arguments->msqId;
-    int msg_size = arguments->msg_size;
+    int msgSize = arguments->msgSize;
     struct rand_msgbuf incomingMSG = {1, 0};
 
     printf("Thread %d Created\n", threadNum);
 
-    int C, total = 0;
+    int total = 0;
 
     for(int i = 0; i < numItems; i++) {
         // Read incoming message
-        msgrcv(msqId, &incomingMSG, msg_size, 1, 0);
-        C = incomingMSG.rand;
+        msgrcv(msqId, &incomingMSG, msgSize, 1, 0);
 
         // Consumer running total
-        total += C;
+        total += incomingMSG.rand;
 
         // Print current state
-        printf("\tConsumer %d thread consumed a %d\n", threadNum, C);
+        printf("\tConsumer %d thread consumed a %d\n", threadNum, incomingMSG.rand);
 
         // Consumer thread 1-3 sleep
         sleep(rand() % 3 + 1);
@@ -81,28 +80,28 @@ int main(int argc, char *argv[ ]) {
     srand(time(NULL));
 
     // Queue key
-    key_t key = ftok("", 'a');
+    key_t key = ftok("msgQueue.c", 'a');
 
     // Creates a message queue
     int msqId = msgget(key, 0666 | IPC_CREAT);
 
     // Queue message size
-    int msg_size = sizeof(int);
+    int msgSize = sizeof(int);
 
     // Create child process
     pid_t childPID = fork();
 
     if(childPID == 0){
-        createConsumers(numItems, msqId, msg_size);
+        createConsumers(numItems, msqId, msgSize);
     } else {
-        createProducer(numItems, msqId, msg_size);
+        createProducer(numItems, msqId, msgSize);
     }
     msgctl(msqId, IPC_RMID, NULL);
 }
 
 
 
-void createProducer(int numItems, int msqId, int msg_size) {
+void createProducer(int numItems, int msqId, int msgSize) {
     printf("Producer Created\n");
     int R, total = 0, status;
 
@@ -114,7 +113,7 @@ void createProducer(int numItems, int msqId, int msg_size) {
 
         // Send random number into queue from consumers
         outgoingMSG.rand = R;
-        msgsnd(msqId, &outgoingMSG, msg_size, 0);
+        msgsnd(msqId, &outgoingMSG, msgSize, 0);
 
         // Producer total
         total += R;
@@ -133,7 +132,7 @@ void createProducer(int numItems, int msqId, int msg_size) {
     printf("Total produced = %d\n\n", total);
 }
 
-void createConsumers(int numItems, int msqId, int msg_size) {
+void createConsumers(int numItems, int msqId, int msgSize) {
     // Create consumer threads
     int numThreads = 3;
     int threadNumItems;
@@ -164,7 +163,7 @@ void createConsumers(int numItems, int msqId, int msg_size) {
         }
 
         // Create thread args
-        thread_args newThreadArgs = {threadNumItems, i, msqId, msg_size};
+        thread_args newThreadArgs = {threadNumItems, i, msqId, msgSize};
         threadArgs[i] = newThreadArgs;
 
         // Create single thread
